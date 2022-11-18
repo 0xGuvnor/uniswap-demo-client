@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import ethLogo from "../assets/eth.png";
 import uniLogo from "../assets/uniswap.png";
@@ -9,9 +9,15 @@ import { useGlobalTransactionContext } from "../context/TransactionContext";
 
 const Header = () => {
   const [selectedNav, setSelectedNav] = useState("Swap");
+  const [username, setUsername] = useState("");
 
   const { connectWallet, currentAccount } = useGlobalTransactionContext();
-  console.log(currentAccount);
+
+  useEffect(() => {
+    setUsername(
+      `${currentAccount?.slice(0, 5)}...${currentAccount?.slice(-4)}`
+    );
+  }, [currentAccount]);
 
   return (
     <div className="flex items-center justify-between w-screen p-4">
@@ -78,7 +84,7 @@ const Header = () => {
               />
             </div>
             <div className="flex items-center justify-center h-8 hover:text-slate-300">
-              {`${currentAccount.slice(0, 5)}...${currentAccount.slice(-4)}`}
+              {username}
             </div>
           </div>
         ) : (
