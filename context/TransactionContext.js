@@ -1,4 +1,8 @@
+import { ethers } from "ethers";
+import { useRouter } from "next/router";
 import { createContext, useContext, useEffect, useState } from "react";
+import { contractAddress, contractABI } from "../lib/constants";
+import { client } from "../lib/sanityClient";
 
 const TransactionContext = createContext();
 
@@ -10,10 +14,24 @@ if (typeof window !== "undefined") {
   metaMask = window.ethereum;
 }
 
+const getEthereumContract = () => {
+  const provider = new ethers.providers.Web3Provider(metaMask);
+  const signer = provider.getSigner();
+  const transactionContract = new ethers.Contract(
+    contractAddress,
+    contractABI,
+    signer
+  );
+
+  return transactionContract;
+};
+
 const TransactionProvider = ({ children }) => {
   const [currentAccount, setCurrentAccount] = useState();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({ addressTo: "", amount: "" });
+
+  const router = useRouter();
 
   const connectWallet = async () => {
     try {
@@ -40,6 +58,28 @@ const TransactionProvider = ({ children }) => {
     } catch (error) {
       console.error(error);
     }
+  };
+
+  const saveTransaction = async (txHash, amount, fromAddress, toAddress) => {
+    const txDoc = {
+      _type: "transactions",
+      _id: txHash,
+      fromAddress,
+      toAddress,
+      timestamp: new Date(Date.now()).toISOString(),
+      txHash,
+      amount: parseFloat(amount),
+    };
+
+    await client.createIfNotExists(txDoc);
+
+    await client
+      .patch(currentAccount)
+      .setIfMissing({ transactions: [] })
+      .insert("after", "transactions[-1]", [
+        { _key: txHash, _ref: txHash, _type: "reference" },
+      ])
+      .commit();
   };
 
   const sendTransaction = async () => {
@@ -69,12 +109,12 @@ const TransactionProvider = ({ children }) => {
 
       const txReceipt = await tx.wait();
 
-      // await saveTransaction(
-      //   txReceipt.hash,
-      //   amount,
-      //   connectedAccount,
-      //   addressTo
-      // );
+      await saveTransaction(
+        txReceipt.transactionHash,
+        amount,
+        currentAccount,
+        addressTo
+      );
 
       setIsLoading(false);
     } catch (error) {
@@ -90,6 +130,29 @@ const TransactionProvider = ({ children }) => {
     isConnected();
   }, []);
 
+  useEffect(() => {
+    if (!currentAccount) return;
+
+    (async () => {
+      const userDoc = {
+        _type: "users",
+        _id: currentAccount,
+        userName: "Unnamed",
+        address: currentAccount,
+      };
+
+      await client.createIfNotExists(userDoc);
+    })();
+  }, [currentAccount]);
+
+  useEffect(() => {
+    if (isLoading) {
+      router.push(`/?loading=${currentAccount}`);
+    } else {
+      router.push(`/`);
+    }
+  }, [isLoading]);
+
   return (
     <TransactionContext.Provider
       value={{
@@ -98,6 +161,7 @@ const TransactionProvider = ({ children }) => {
         sendTransaction,
         handleChange,
         formData,
+        isLoading,
       }}
     >
       {children}

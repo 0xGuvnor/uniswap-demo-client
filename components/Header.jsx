@@ -83,7 +83,7 @@ const Header = () => {
                 width={20}
               />
             </div>
-            <div className="flex items-center justify-center h-8 hover:text-slate-300">
+            <div className="flex h-8 items-center justify-center pr-[.14rem] hover:text-slate-300">
               {username}
             </div>
           </div>
